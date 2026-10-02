@@ -1,0 +1,17 @@
+{
+  "name": "cache",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsx scripts/build-site.ts",
+    "pack": "node scripts/build-pack.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx src/lib/search.test.ts && tsx src/ui/replicate.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,145 @@
+/*
+  A field manual, not a dashboard.
+
+  Paper and ink by default because this gets read outdoors, and dark UI
+  washes out in sunlight. One colour does work — safety orange, for the line
+  that says call for help and for cautions inside remedy cards. "Red light"
+  turns everything deep red on black, which is what you use at night so your
+  eyes stay dark-adapted. Everything is one column, because it is used one
+  thumb at a time by someone who is frightened.
+*/
+:root {
+  --bg: #f6f3ea; --card: #fffdf7; --ink: #15140f; --mid: #57544a; --dim: #8a867a; --rule: #d9d3c4;
+  --accent: #d9480f; --mark: #ffe28a; --mark-ink: #15140f; --ok: #2b7a3d;
+  --size: 17px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-night="1"]) {
+    --bg: #121210; --card: #1b1a17; --ink: #efece4; --mid: #b4afa3; --dim: #807b70; --rule: #34322c;
+    --accent: #ff7a3d; --mark: #6b5414; --mark-ink: #fff4cf; --ok: #6cc781;
+    color-scheme: dark;
+  }
+}
+:root[data-night="1"] {
+  --bg: #000; --card: #0a0000; --ink: #ff3b30; --mid: #c4271e; --dim: #8f1d16; --rule: #3d0b08;
+  --accent: #ff3b30; --mark: #4d0d09; --mark-ink: #ff6b5f; --ok: #ff3b30;
+  color-scheme: dark;
+}
+:root[data-big="1"] { --size: 20px; }
+
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: var(--size)/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+}
+a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+mark { background: var(--mark); color: var(--mark-ink); border-radius: 2px; padding: 0 1px; }
+
+.top {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  background: var(--bg); border-bottom: 1px solid var(--rule);
+}
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mark-logo { color: var(--accent); font-size: 1.2em; line-height: 1; }
+.name { font-weight: 900; letter-spacing: .18em; }
+.chip {
+  font-size: .68em; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  border: 1px solid var(--rule); border-radius: 99px; padding: 2px 9px; color: var(--mid);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.chip[data-ok="1"] { color: var(--ok); border-color: currentColor; }
+.tools { display: flex; gap: 6px; flex-shrink: 0; }
+.tool {
+  background: none; border: 1px solid var(--rule); border-radius: 8px; padding: 5px 10px;
+  font-size: .72em; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+}
+.tool[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+.wrap { max-width: 760px; margin: 0 auto; padding: 14px 16px 64px; }
+.sos {
+  margin: 4px 0 14px; padding: 10px 12px; border-left: 4px solid var(--accent);
+  background: var(--card); font-size: .86em; color: var(--mid);
+}
+.sos strong { color: var(--accent); }
+
+.q {
+  width: 100%; font: inherit; font-size: 1.12em; padding: 14px 16px; border-radius: 12px;
+  border: 2px solid var(--ink); background: var(--card); color: var(--ink); outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.q:focus { border-color: var(--accent); }
+.q::placeholder { color: var(--dim); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 6px; }
+.qchip {
+  background: var(--card); border: 1px solid var(--rule); border-radius: 99px;
+  padding: 6px 12px; font-size: .82em;
+}
+.qchip:active { border-color: var(--accent); }
+
+.main { margin-top: 14px; }
+.band { font-size: .78em; letter-spacing: .14em; text-transform: uppercase; color: var(--mid); margin: 26px 0 10px; }
+.note, .understood { font-size: .84em; color: var(--mid); }
+.understood { margin: 2px 0 10px; }
+.empty { color: var(--mid); padding: 18px 0; }
+
+.card {
+  background: var(--card); border: 1px solid var(--rule); border-radius: 14px;
+  padding: 14px 16px; margin: 0 0 12px;
+}
+.card-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.title {
+  background: none; border: 0; padding: 0; text-align: left;
+  font-size: 1.08em; font-weight: 800; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 4px;
+}
+.title.static { text-decoration: none; }
+.shelf { font-size: .7em; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.passage { margin: 10px 0 0; padding: 0 0 0 12px; border-left: 2px solid var(--rule); }
+.passage p { margin: 4px 0 0; }
+.sec { font-size: .72em; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+.cite { font-size: .74em; color: var(--dim); margin: 10px 0 0; }
+.remedy p { margin: 6px 0 0; }
+.caution { color: var(--accent); }
+.evidence { font-size: .84em; color: var(--mid); }
+
+.back { background: none; border: 0; padding: 4px 0; color: var(--mid); font-weight: 700; }
+.rtitle { font-size: 1.6em; line-height: 1.2; margin: 10px 0 4px; }
+.rsec h3 { font-size: 1em; margin: 22px 0 6px; }
+.rsec p { margin: 0 0 10px; }
+
+.shelves { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.shelf-btn {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left;
+  background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; font-weight: 700;
+}
+.shelf-btn .n { font-weight: 400; color: var(--dim); font-variant-numeric: tabular-nums; }
+.titles { list-style: none; padding: 0; margin: 0; columns: 2 220px; column-gap: 18px; }
+.titles li { break-inside: avoid; }
+.titles button { background: none; border: 0; padding: 5px 0; text-align: left; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+
+.copy {
+  margin-top: 44px; padding: 18px; border: 2px dashed var(--ink); border-radius: 16px; background: var(--card);
+}
+.copy h2 { margin: 0 0 6px; font-size: 1.15em; }
+.copy p { margin: 6px 0; }
+.copy-btn {
+  display: block; width: 100%; margin: 14px 0 6px; padding: 15px 16px; border: 0; border-radius: 12px;
+  background: var(--ink); color: var(--bg); font-weight: 900; letter-spacing: .02em;
+}
+:root[data-night="1"] .copy-btn { background: #3d0b08; color: #ff3b30; }
+.copy-msg { font-size: .84em; color: var(--ok); min-height: 1.2em; }
+.lineage { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; padding: 0; margin: 12px 0; font-size: .78em; }
+.lineage li { display: flex; align-items: center; gap: 6px; color: var(--mid); }
+.lineage li + li::before { content: ""; width: 18px; height: 2px; background: var(--rule); margin: 0 6px; }
+.lineage .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.lineage .gen0 .dot { background: var(--ink); }
+.lineage small { color: var(--dim); }
+.fine { font-size: .74em; color: var(--dim); }
+
+@media (max-width: 420px) { .tool { padding: 5px 7px; } .wide { display: none; } .name { letter-spacing: .12em; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
