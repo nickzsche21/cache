@@ -13,7 +13,7 @@ of itself.
 
 ## What is inside
 
-**Library — 772 documents, about 28,500 passages**
+**Library — 774 documents, about 28,500 passages**
 
 - **749 Wikipedia articles** across 15 shelves: first aid, heat, cold and bites (including India's
   “big four” snakes), illness (dengue, chikungunya, leptospirosis, typhoid, malaria…), everyday
