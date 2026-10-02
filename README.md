@@ -6,7 +6,7 @@ Open it once and it works in airplane mode. Press one button and the whole libra
 the search, and that same button — becomes **one HTML file** you can AirDrop, Bluetooth, or carry on a
 USB stick to someone with no internet. It opens in any browser, and it can make copies of itself.
 
-**Live:** (deploying)
+**Live:** https://cache-orcin-gamma.vercel.app
 
 ---
 
