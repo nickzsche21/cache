@@ -1,10 +1,19 @@
-import { mount, type Host } from "./app";
+import { gunzipSync, strFromU8 } from "fflate";
+import { mount } from "./app";
+import type { Host } from "./ctx";
 import { IDS, embedJSON, type Meta } from "./replicate";
 import type { Pack } from "../lib/search";
 
 const byId = (id: string) => document.getElementById(id)!;
 const meta = JSON.parse(byId(IDS.meta).textContent ?? "{}") as Meta;
-const pack = JSON.parse(byId(IDS.pack).textContent ?? "{}") as Pack;
+/** The library travels gzipped inside the file; unpacking it takes a moment, once. */
+function unpack(b64: string): Pack {
+  const bin = atob(b64.replace(/\s+/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(strFromU8(gunzipSync(bytes))) as Pack;
+}
+const pack = unpack(byId(IDS.pack).textContent ?? "");
 
 const onWeb = /^https?:$/.test(location.protocol);
 const kind: Host["kind"] = meta.generation === 0 && onWeb ? "site" : "copy";

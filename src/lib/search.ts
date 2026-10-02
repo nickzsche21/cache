@@ -15,7 +15,12 @@
 
 /* ── the pack ─────────────────────────────────────────────────────────────── */
 
-export type Doc = { id: number; t: string; shelf: string; rev: number | null; ts: string | null; s: [string, string][] };
+export type Doc = {
+  id: number; t: string; shelf: string; s: [string, string][];
+  /** wp: Wikipedia (rev, ts) · fm: FM 21-76 (chapter) · epa / ready: US government pages (url). */
+  src?: "wp" | "fm" | "epa" | "ready";
+  rev?: number | null; ts?: string | null; url?: string; chapter?: number;
+};
 export type Remedy = {
   slug: string; name: string; commonNames: string[]; conditions: string[];
   uses: string; how: string; evidence: string; cautions: string; sourceUrl: string; kind: "home" | "natural";
@@ -26,6 +31,12 @@ export type Pack = {
   shelves: Record<string, string>;
   sources: Record<string, { name: string; license: string; url: string; commit?: string }>;
   conditions: Condition[]; remedies: Remedy[]; docs: Doc[];
+  data?: {
+    bleach: string[][];
+    kit: { basic: string[]; more: string[]; upkeep: string[] };
+    numbers: { country: string; police: string; ambulance: string; fire: string; other: string }[];
+    numbersRev: number;
+  };
 };
 
 /* ── words ────────────────────────────────────────────────────────────────── */
@@ -79,8 +90,17 @@ function rule(w: string, pairs: [string, string][], cond: (stem: string) => bool
   return null;
 }
 
-/** Martin Porter's 1980 stemmer, the original algorithm. */
+/* 1.6 million tokens but only tens of thousands of distinct words: stemming
+   each word once instead of every time it appears is most of the index time. */
+const STEMS = new Map<string, string>();
 export function stem(word: string): string {
+  let s = STEMS.get(word);
+  if (s === undefined) { s = porter(word); if (STEMS.size < 400_000) STEMS.set(word, s); }
+  return s;
+}
+
+/** Martin Porter's 1980 stemmer, the original algorithm. */
+function porter(word: string): string {
   let w = word;
   if (w.length <= 2) return w;
 
@@ -206,13 +226,10 @@ export type Index = {
   phrases: { slug: string; stems: string[] }[];
 };
 
-export function build(pack: Pack): Index {
-  const chunks = chunk(pack);
-  const post = new Map<string, number[]>();
-  const len = new Float32Array(chunks.length);
+function indexRange(pack: Pack, chunks: Chunk[], post: Map<string, number[]>, len: Float32Array, from: number, to: number): number {
   let total = 0;
-
-  chunks.forEach((c, i) => {
+  for (let i = from; i < to; i++) {
+    const c = chunks[i];
     const d = pack.docs[c.doc];
     // Title and heading words count in the passage too: a paragraph under
     // "Snakebite › Treatment" is about snakebite whether or not it says so.
@@ -226,8 +243,11 @@ export function build(pack: Pack): Index {
       if (!p) post.set(w, (p = []));
       p.push(i, n);
     }
-  });
+  }
+  return total;
+}
 
+function finish(pack: Pack, chunks: Chunk[], post: Map<string, number[]>, len: Float32Array, total: number): Index {
   /* NOMAD's conditions, kept as whole phrases. Matching them word by word
      was wrong in a way that matters: "bite" belongs to "insect bites", so a
      snakebite pulled in insect-bite home remedies. A condition now applies
@@ -239,13 +259,37 @@ export function build(pack: Pack): Index {
       if (st.length) phrases.push({ slug: c.slug, stems: st });
     }
   }
-
   return {
     pack, chunks, post, len, avg: total / Math.max(1, chunks.length),
     titleTerms: pack.docs.map((d) => new Set(terms(d.t))),
     vocab: [...post.keys()].sort(),
     phrases,
   };
+}
+
+export function build(pack: Pack): Index {
+  const chunks = chunk(pack);
+  const post = new Map<string, number[]>();
+  const len = new Float32Array(chunks.length);
+  const total = indexRange(pack, chunks, post, len, 0, chunks.length);
+  return finish(pack, chunks, post, len, total);
+}
+
+/**
+ * The same index, built a slice at a time so the page stays responsive on a
+ * slow phone — the tools work while the library is still being read.
+ */
+export async function buildAsync(pack: Pack, onProgress?: (fraction: number) => void, slice = 1200): Promise<Index> {
+  const chunks = chunk(pack);
+  const post = new Map<string, number[]>();
+  const len = new Float32Array(chunks.length);
+  let total = 0;
+  for (let i = 0; i < chunks.length; i += slice) {
+    total += indexRange(pack, chunks, post, len, i, Math.min(chunks.length, i + slice));
+    onProgress?.(Math.min(1, (i + slice) / chunks.length));
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  return finish(pack, chunks, post, len, total);
 }
 
 /* ── querying ─────────────────────────────────────────────────────────────── */
@@ -386,5 +430,14 @@ export function snippet(text: string, marks: [number, number][], width = 280): H
 
 /** A permanent link to the exact revision a passage came from. */
 export const citeUrl = (d: Doc) =>
+  d.src && d.src !== "wp" ? d.url ?? "" :
   d.rev ? `https://en.wikipedia.org/w/index.php?title=${encodeURIComponent(d.t.replace(/ /g, "_"))}&oldid=${d.rev}`
     : `https://en.wikipedia.org/wiki/${encodeURIComponent(d.t.replace(/ /g, "_"))}`;
+
+/** The citation line, in words, for whichever source a document came from. */
+export function citeText(d: Doc): string {
+  if (d.src === "fm") return `US Army Field Manual FM 21-76, Survival (1992), chapter ${d.chapter}. Public domain. Its figures and tables did not survive digitisation, so references to them have nothing to point at.`;
+  if (d.src === "epa") return "US Environmental Protection Agency, Emergency Disinfection of Drinking Water. Public domain.";
+  if (d.src === "ready") return "Ready.gov (FEMA), Build a Kit. Public domain.";
+  return `Wikipedia, “${d.t}”, ${d.rev ? `revision ${d.rev}` : "current revision"}${d.ts ? `, ${d.ts}` : ""}. CC BY-SA 4.0.`;
+}

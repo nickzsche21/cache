@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { stem, terms, build, search, snippet, chunk, citeUrl, type Pack } from "./search";
+import { stem, terms, build, buildAsync, search, snippet, chunk, citeUrl, citeText, type Pack } from "./search";
 
 let pass = 0;
 const fails: string[] = [];
@@ -57,7 +57,17 @@ expect("morse code sos", ["Morse code", "SOS"]);
 expect("tie a bowline", ["Bowline"], 1);
 expect("carbon monoxide generator", ["Carbon monoxide poisoning", "Engine–generator"]);
 expect("start a fire without matches", ["Fire making", "Bow drill", "Ferrocerium", "Fire piston", "Hand drill", "Fire striker"], 5);
-expect("find north without a compass", ["Natural navigation", "Polaris", "Celestial navigation", "Orienteering"], 5);
+expect("find north without a compass", ["Natural navigation", "Polaris", "Celestial navigation", "Orienteering", "Army Survival Manual · 18. Field-expedient direction finding"], 5);
+/* The questions the bigger library exists for. */
+expect("dengue fever", ["Dengue fever"], 1);
+expect("krait bite", ["Bungarus caeruleus", "Big four (Indian snakes)", "Snakebite"]);
+expect("cyclone warning", ["Cyclone", "North Indian Ocean tropical cyclone", "Tropical cyclone"]);
+expect("panic attack breathing", ["Panic attack", "Diaphragmatic breathing"]);
+expect("keep food cold without electricity", ["Pot-in-pot refrigerator", "Evaporative cooler", "Haybox", "Food preservation", "Root cellar"], 5);
+expect("solar still", ["Solar still", "Army Survival Manual · 6. Water procurement"]);
+expect("baby jaundice", ["Neonatal jaundice"], 2);
+expect("flat tyre bicycle", ["Flat tire", "Bicycle tire"]);
+expect("leptospirosis flood water", ["Leptospirosis"], 2);
 
 /* ── NOMAD's vocabulary does the work a model would ─────────────────────── */
 {
@@ -101,14 +111,50 @@ expect("find north without a compass", ["Natural navigation", "Polaris", "Celest
   ok("a snippet centres on the match", s.text.includes("target") && s.cut[0] && s.cut[1]);
 }
 
+/* ── sources are cited for what they are ────────────────────────────────── */
+{
+  const fm = pack.docs.find((d) => d.src === "fm")!;
+  ok("the manual cites itself as FM 21-76", /FM 21-76/.test(citeText(fm)) && /Public domain/.test(citeText(fm)));
+  ok("and admits its figures are missing", /figures and tables/.test(citeText(fm)));
+  const epa = pack.docs.find((d) => d.src === "epa")!;
+  ok("EPA cites the EPA, with a link", /Environmental Protection Agency/.test(citeText(epa)) && citeUrl(epa).startsWith("https://www.epa.gov/"));
+  const wp = pack.docs.find((d) => d.src === "wp")!;
+  ok("Wikipedia keeps its revision citation", /revision \d+/.test(citeText(wp)));
+}
+
+/* ── the slow-phone path gives the same index ───────────────────────────── */
+async function sameIndex() {
+  let calls = 0;
+  const a = await buildAsync(pack, () => calls++, 3000);
+  ok(`async indexing reports progress (${calls} updates)`, calls > 3);
+  ok("and builds the same postings", a.post.size === ix.post.size && a.chunks.length === ix.chunks.length);
+  const qa = search(a, "snake bite").results.map((r) => r.doc.t).join("|");
+  const qb = search(ix, "snake bite").results.map((r) => r.doc.t).join("|");
+  ok("and answers identically", qa === qb);
+}
+
 /* ── the pack ───────────────────────────────────────────────────────────── */
 ok(`NOMAD's remedies are aboard (${pack.remedies.length})`, pack.remedies.length === 38);
+ok(`the Army Survival Manual is aboard, all of it (${pack.docs.filter((d) => (d as { src?: string }).src === "fm").length} chapters)`,
+  pack.docs.filter((d) => (d as { src?: string }).src === "fm").length === 23);
+ok(`a much bigger library (${pack.docs.length} documents)`, pack.docs.length > 700);
+ok(`every country's emergency numbers (${(pack as unknown as { data: { numbers: unknown[] } }).data.numbers.length})`,
+  (pack as unknown as { data: { numbers: unknown[] } }).data.numbers.length > 200);
+{
+  const rows = (pack as unknown as { data: { numbers: { country: string; police: string; other: string }[] } }).data.numbers;
+  const india = rows.find((r) => r.country === "India")!;
+  ok("India is 112 for everything", india.police === "112");
+  ok(`and its helplines end where they should, not on a footnote (${india.other.slice(-24)})`, /Fire brigade – 101$/.test(india.other));
+  ok("no table cell carries a citation-needed tag", rows.every((r) => !/citation needed/i.test(JSON.stringify(r))));
+}
 ok(`every NOMAD condition has reading to go with it (${pack.docs.filter((d) => d.shelf === "everyday").length})`, pack.docs.filter((d) => d.shelf === "everyday").length >= 30);
 ok("every remedy cites its source", pack.remedies.every((r) => /^https?:\/\//.test(r.sourceUrl)));
 ok("every remedy says what to watch for", pack.remedies.every((r) => r.cautions.length > 10));
 ok("NOMAD's collections are pinned to a commit", /^[0-9a-f]{40}$/.test(pack.sources.nomad.commit ?? ""));
 ok("chunking keeps every section", chunk(pack).length >= pack.docs.reduce((n, d) => n + d.s.length, 0));
 
-console.log(fails.length ? `✗ ${fails.length} failed of ${pass + fails.length}` : `✓ ${pass} assertions pass`);
-for (const f of fails) console.log("  ✗", f);
-process.exit(fails.length ? 1 : 0);
+sameIndex().then(() => {
+  console.log(fails.length ? `✗ ${fails.length} failed of ${pass + fails.length}` : `✓ ${pass} assertions pass`);
+  for (const f of fails) console.log("  ✗", f);
+  process.exit(fails.length ? 1 : 0);
+});

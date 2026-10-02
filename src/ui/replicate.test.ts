@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { assemble, descend, embedJSON, fileName, IDS, type Meta, type Parts } from "./replicate";
+
+const unpackB64 = (b64: string) => JSON.parse(zlib.gunzipSync(Buffer.from(b64, "base64")).toString("utf8"));
+const packB64 = (v: unknown) => zlib.gzipSync(Buffer.from(JSON.stringify(v))).toString("base64");
 
 let pass = 0;
 const fails: string[] = [];
@@ -12,7 +16,7 @@ function extract(html: string): Parts {
   return {
     css: grab(new RegExp(`<style id="${IDS.css}">([\\s\\S]*?)</style>`)),
     js: grab(new RegExp(`<script id="${IDS.js}">([\\s\\S]*?)</script>`)),
-    pack: grab(new RegExp(`<script type="application/json" id="${IDS.pack}">([\\s\\S]*?)</script>`)),
+    pack: grab(new RegExp(`<script type="application/octet-stream" id="${IDS.pack}"[^>]*>([\\s\\S]*?)</script>`)),
     meta: JSON.parse(grab(new RegExp(`<script type="application/json" id="${IDS.meta}">([\\s\\S]*?)</script>`))),
   };
 }
@@ -27,11 +31,14 @@ const meta0: Meta = { generation: 0, home: "https://example.test/", built: "2026
 /* ── nothing in the library can break out of its script tag ─────────────── */
 {
   const hostile = { docs: [{ t: "</script><script>alert(1)</script>", s: [["<!--", "</SCRIPT >  <img src=x onerror=alert(2)>"]] }] };
-  const html = assemble({ css: "body{}", js: "void 0", pack: JSON.stringify(hostile), meta: meta0 });
+  const html = assemble({ css: "body{}", js: "void 0", pack: packB64(hostile), meta: meta0 });
   const n = scripts(html);
   ok(`exactly three scripts, however hostile the text (${n.open} open, ${n.close} close)`, n.open === 3 && n.close === 3);
-  ok("no raw angle bracket survives inside the pack", !/<\/?script/i.test(extract(html).pack) && !extract(html).pack.includes("<img"));
-  ok("and the text comes back exactly", JSON.parse(extract(html).pack).docs[0].t === hostile.docs[0].t);
+  ok("the packed library is pure base64", /^[A-Za-z0-9+/=]+$/.test(extract(html).pack));
+  ok("and the text comes back exactly", unpackB64(extract(html).pack).docs[0].t === hostile.docs[0].t);
+  let threwRaw = false;
+  try { assemble({ css: "", js: "", pack: '{"a":"</script>"}', meta: meta0 }); } catch { threwRaw = true; }
+  ok("an unpacked library is refused rather than inlined", threwRaw);
   ok("embedJSON escapes every <", !embedJSON({ a: "<<<" }).includes("<"));
   let threw = false;
   try { assemble({ css: "", js: 'x="</script>"', pack: "{}", meta: meta0 }); } catch { threw = true; }
@@ -63,11 +70,14 @@ const meta0: Meta = { generation: 0, home: "https://example.test/", built: "2026
   ok(`the site has exactly three scripts (${n.open}/${n.close})`, n.open === 3 && n.close === 3);
   ok("the program never closes its own tag", !/<\/script/i.test(p0.js));
   ok("and never opens a comment that would swallow the file", !p0.js.includes("\x3c!--"));
-  const pack = JSON.parse(p0.pack);
-  ok(`the whole library is inside (${pack.docs.length} articles)`, pack.docs.length > 250 && pack.remedies.length === 38);
+  const pack = unpackB64(p0.pack);
+  ok(`the whole library is inside (${pack.docs.length} documents)`, pack.docs.length > 700 && pack.remedies.length === 38);
+  const raw = fs.readFileSync(path.resolve(__dirname, "../../public/pack.json"), "utf8");
+  ok("and it unpacks to exactly the built library", JSON.stringify(pack) === JSON.stringify(JSON.parse(raw)));
+  ok(`packing makes the file much smaller (${(site.length / 1e6).toFixed(1)} MB for a ${(raw.length / 1e6).toFixed(1)} MB library)`, site.length < raw.length * 0.6);
 
   // Self-contained: nothing in the markup asks the network for anything.
-  const markup = site.replace(new RegExp(`<script type="application/json" id="${IDS.pack}">[\\s\\S]*?</script>`), "");
+  const markup = site.replace(new RegExp(`<script type="application/octet-stream" id="${IDS.pack}"[^>]*>[\\s\\S]*?</script>`), "");
   ok("no external scripts", !/<script[^>]+src=/i.test(markup));
   ok("no stylesheets, images or fonts to fetch", !/<link\b|<img\b|@import|url\(\s*["']?https?:/i.test(markup));
 

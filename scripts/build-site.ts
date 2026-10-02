@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 import { build as esbuild, transform } from "esbuild";
 import { assemble, type Meta } from "../src/ui/replicate";
 
@@ -22,9 +23,11 @@ async function main() {
   const css = (await transform(fs.readFileSync(path.join(root, "src/ui/style.css"), "utf8"), { loader: "css", minify: true })).code;
   const packText = fs.readFileSync(path.join(root, "public/pack.json"), "utf8");
   const pack = JSON.parse(packText);
+  // Gzip with a zero timestamp so the same library always encodes to the same bytes.
+  const packB64 = zlib.gzipSync(Buffer.from(JSON.stringify(pack)), { level: 9 }).toString("base64");
   const meta: Meta = { generation: 0, home: "", built: pack.built, lineage: [] };
 
-  const html = assemble({ css, js, pack: packText, meta });
+  const html = assemble({ css, js, pack: packB64, meta });
   fs.writeFileSync(path.join(dist, "index.html"), html);
 
   const version = crypto.createHash("sha256").update(html).digest("hex").slice(0, 12);
@@ -65,6 +68,6 @@ self.addEventListener("fetch", (e) => {
 
   const kb = (n: number) => `${(n / 1024).toFixed(0)} KB`;
   const gz = (await import("node:zlib")).gzipSync(html).length;
-  console.log(`index.html ${(html.length / 1e6).toFixed(2)} MB (${(gz / 1e6).toFixed(2)} MB gzipped) — program ${kb(js.length)}, style ${kb(css.length)}; sw ${version}`);
+  console.log(`index.html ${(html.length / 1e6).toFixed(2)} MB (${(gz / 1e6).toFixed(2)} MB on the wire) — library ${(packText.length / 1e6).toFixed(1)} MB packed to ${(packB64.length / 1e6).toFixed(1)} MB; program ${kb(js.length)}, style ${kb(css.length)}; sw ${version}`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

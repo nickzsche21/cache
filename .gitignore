@@ -4,4 +4,6 @@ dist
 *.tsbuildinfo
 .cache/wiki
 .cache/copytest
+.cache/*.html
+.cache/emergency-numbers.json
 .env*

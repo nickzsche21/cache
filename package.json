@@ -6,12 +6,15 @@
     "build": "tsx scripts/build-site.ts",
     "pack": "node scripts/build-pack.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/lib/search.test.ts && tsx src/ui/replicate.test.ts"
+    "test": "tsx src/lib/search.test.ts && tsx src/ui/replicate.test.ts && tsx src/lib/tools/tools.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20",
     "esbuild": "^0.25.0",
     "tsx": "^4.23.13",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "fflate": "0.8.2"
   }
 }
