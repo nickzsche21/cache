@@ -34,7 +34,19 @@ if (kind === "site" && "serviceWorker" in navigator) {
   link.rel = "manifest"; link.href = "manifest.webmanifest";
   document.head.append(link);
   const here = new URL("./", location.href).href;
-  navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then(async () => {
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  // A newer worker taking over means a newer library has been saved. Say so,
+  // rather than reloading under someone in the middle of reading.
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController || document.getElementById("cache-update")) return;
+    const bar = document.createElement("button");
+    bar.id = "cache-update";
+    bar.className = "update-bar";
+    bar.textContent = "A newer library is saved — tap to load it";
+    bar.addEventListener("click", () => location.reload());
+    document.body.append(bar);
+  });
+  navigator.serviceWorker.register("sw.js").then((reg) => { void reg.update().catch(() => {}); return navigator.serviceWorker.ready; }).then(async () => {
     for (let i = 0; i < 40; i++) {
       if (await caches.match(here)) return set("ready");
       await new Promise((r) => setTimeout(r, 500));

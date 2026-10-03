@@ -265,3 +265,9 @@ summary { cursor: pointer; color: var(--mid); font-weight: 700; }
 .ice-row { display: flex; flex-direction: column; padding: 10px 0; border-top: 2px solid #eee; }
 .ice-row span { font-size: .72em; text-transform: uppercase; letter-spacing: .1em; color: #555; }
 .ice-row strong { font-size: 1.15em; }
+
+.update-bar {
+  position: fixed; left: 12px; right: 12px; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 40;
+  padding: 12px 14px; border: 0; border-radius: 12px; background: var(--ink); color: var(--bg); font-weight: 800;
+  box-shadow: 0 6px 24px rgba(0,0,0,.25);
+}

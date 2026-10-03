@@ -35,7 +35,10 @@ async function main() {
 const VERSION = "cache-${version}";
 const SHELL = ["./", "./manifest.webmanifest", "./icon.svg"];
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // "reload" goes past the HTTP cache, so a new worker never installs an old page.
+  e.waitUntil(caches.open(VERSION)
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys()
@@ -47,12 +50,15 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
   if (req.mode === "navigate") {
     // Cached copy first, always: someone in trouble should not wait on a dead
-    // network. A fresh copy is fetched behind it for next time.
-    e.respondWith(caches.open(VERSION).then(async (c) => {
-      const hit = await c.match("./");
-      const fresh = fetch(req).then((r) => { if (r.ok) c.put("./", r.clone()); return r; }).catch(() => null);
-      return hit || (await fresh) || new Response("Offline, and this browser has not saved the library yet.", { status: 503 });
-    }));
+    // network. A fresh copy is fetched behind it for next time — and waitUntil
+    // keeps this worker alive until it is saved. Without it the browser may
+    // stop the worker the moment the page is answered, mid-download, and the
+    // update never lands.
+    const refresh = caches.open(VERSION).then((c) =>
+      fetch(req, { cache: "no-cache" }).then((r) => (r.ok ? c.put("./", r.clone()).then(() => r) : r)).catch(() => null));
+    e.waitUntil(refresh);
+    e.respondWith(caches.open(VERSION).then(async (c) =>
+      (await c.match("./")) || (await refresh) || new Response("Offline, and this browser has not saved the library yet.", { status: 503 })));
     return;
   }
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
